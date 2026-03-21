@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+@theme {
+  /* Semantic theme colors — used across all components */
+  --color-bg-primary: var(--mm-bg-primary);
+  --color-bg-secondary: var(--mm-bg-secondary);
+  --color-bg-tertiary: var(--mm-bg-tertiary);
+  --color-border-primary: var(--mm-border-primary);
+  --color-border-secondary: var(--mm-border-secondary);
+  --color-text-primary: var(--mm-text-primary);
+  --color-text-secondary: var(--mm-text-secondary);
+  --color-text-tertiary: var(--mm-text-tertiary);
+
+  /* Semantic status colors */
+  --color-success: #1D9E75;
+  --color-danger: #E24B4A;
+  --color-warning: #BA7517;
+  --color-info: #378ADD;
+  --color-purple: #534AB7;
+
+  /* Backgrounds for status badges */
+  --color-bg-success: #E1F5EE;
+  --color-bg-danger: #FCEBEB;
+  --color-bg-warning: #FAEEDA;
+  --color-bg-info: #E6F1FB;
+  --color-bg-purple: #EEEDFE;
+
+  /* Text for status badges */
+  --color-txt-success: #0F6E56;
+  --color-txt-danger: #A32D2D;
+  --color-txt-warning: #854F0B;
+  --color-txt-info: #185FA5;
+  --color-txt-purple: #534AB7;
+
+  /* Legacy compatibility */
+  --color-brand: #378ADD;
+  --color-positive: #1D9E75;
+  --color-negative: #E24B4A;
+}
+
+:root {
+  /* Light mode (default) */
+  --mm-bg-primary: #FFFFFF;
+  --mm-bg-secondary: #F5F5F0;
+  --mm-bg-tertiary: #EEEDEB;
+  --mm-border-primary: #D5D4D0;
+  --mm-border-secondary: #E5E4E0;
+  --mm-text-primary: #1A1915;
+  --mm-text-secondary: #73726C;
+  --mm-text-tertiary: #9C9A92;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --mm-bg-primary: #1A1915;
+    --mm-bg-secondary: #262620;
+    --mm-bg-tertiary: #2F2F28;
+    --mm-border-primary: #3D3D35;
+    --mm-border-secondary: #4A4A42;
+    --mm-text-primary: #E8E7E3;
+    --mm-text-secondary: #9C9A92;
+    --mm-text-tertiary: #73726C;
+  }
+}
+
+/* Force dark mode class override */
+[data-theme="dark"] {
+  --mm-bg-primary: #1A1915;
+  --mm-bg-secondary: #262620;
+  --mm-bg-tertiary: #2F2F28;
+  --mm-border-primary: #3D3D35;
+  --mm-border-secondary: #4A4A42;
+  --mm-text-primary: #E8E7E3;
+  --mm-text-secondary: #9C9A92;
+  --mm-text-tertiary: #73726C;
+}
+
+[data-theme="light"] {
+  --mm-bg-primary: #FFFFFF;
+  --mm-bg-secondary: #F5F5F0;
+  --mm-bg-tertiary: #EEEDEB;
+  --mm-border-primary: #D5D4D0;
+  --mm-border-secondary: #E5E4E0;
+  --mm-text-primary: #1A1915;
+  --mm-text-secondary: #73726C;
+  --mm-text-tertiary: #9C9A92;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--mm-bg-secondary);
+  color: var(--mm-text-primary);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--mm-bg-secondary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--mm-border-secondary);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mm-text-tertiary);
+}
+
+/* Shared component classes */
+.card {
+  background: var(--mm-bg-primary);
+  border: 0.5px solid var(--mm-border-primary);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.tag {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--mm-bg-secondary);
+  color: var(--mm-text-secondary);
+}
+
+.tag-active {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-bg-info);
+  color: var(--color-txt-info);
+}

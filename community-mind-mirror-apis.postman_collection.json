@@ -1,0 +1,824 @@
+{
+	"info": {
+		"_postman_id": "cmm-apis-2026",
+		"name": "Community Mind Mirror — All APIs",
+		"description": "Complete API collection for the Community Mind Mirror project.\n\n## Sources\n1. Reddit (.rss) — No registration needed\n2. Hacker News — No registration needed\n3. YouTube Data API v3 — Needs Google Cloud registration\n4. News RSS Feeds — No registration needed\n5. ArXiv API — No registration needed\n6. JobSpy — Python library, no API (not in this collection)\n\n## Registration Required\n- YouTube: https://console.cloud.google.com → Create project → Enable YouTube Data API v3 → Create API Key",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "YOUTUBE_API_KEY",
+			"value": "YOUR_YOUTUBE_API_KEY_HERE",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Reddit RSS",
+			"description": "No registration needed. No API key. Just add .rss to any Reddit URL.\n\nRate limit: ~1 request per 5 seconds with browser-like User-Agent.\nReturns: Atom XML feed with posts/comments.\n\nIMPORTANT: Set User-Agent header to a browser-like string to avoid aggressive rate limiting.",
+			"item": [
+				{
+					"name": "1.1 Subreddit — Top posts (month)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "User-Agent",
+								"value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) CommunityMindMirror/1.0"
+							}
+						],
+						"url": {
+							"raw": "https://www.reddit.com/r/artificial/top/.rss?sort=top&t=month&limit=100",
+							"protocol": "https",
+							"host": ["www", "reddit", "com"],
+							"path": ["r", "artificial", "top", ".rss"],
+							"query": [
+								{"key": "sort", "value": "top"},
+								{"key": "t", "value": "month", "description": "hour, day, week, month, year, all"},
+								{"key": "limit", "value": "100", "description": "Max ~100 per request"}
+							]
+						},
+						"description": "Get top posts from a subreddit. Change 'artificial' to any subreddit name.\n\nOther sort options: hot, new, rising, controversial"
+					}
+				},
+				{
+					"name": "1.2 Subreddit — New posts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "User-Agent",
+								"value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) CommunityMindMirror/1.0"
+							}
+						],
+						"url": {
+							"raw": "https://www.reddit.com/r/artificial/new/.rss?sort=new&limit=100",
+							"protocol": "https",
+							"host": ["www", "reddit", "com"],
+							"path": ["r", "artificial", "new", ".rss"],
+							"query": [
+								{"key": "sort", "value": "new"},
+								{"key": "limit", "value": "100"}
+							]
+						}
+					}
+				},
+				{
+					"name": "1.3 Subreddit — All comments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "User-Agent",
+								"value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) CommunityMindMirror/1.0"
+							}
+						],
+						"url": {
+							"raw": "https://www.reddit.com/r/artificial/comments/.rss?sort=new&limit=100",
+							"protocol": "https",
+							"host": ["www", "reddit", "com"],
+							"path": ["r", "artificial", "comments", ".rss"],
+							"query": [
+								{"key": "sort", "value": "new"},
+								{"key": "limit", "value": "100"}
+							]
+						},
+						"description": "All comments across all posts in a subreddit. Great for discovering active users."
+					}
+				},
+				{
+					"name": "1.4 User profile — All activity",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "User-Agent",
+								"value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) CommunityMindMirror/1.0"
+							}
+						],
+						"url": {
+							"raw": "https://www.reddit.com/user/spez/.rss",
+							"protocol": "https",
+							"host": ["www", "reddit", "com"],
+							"path": ["user", "spez", ".rss"]
+						},
+						"description": "Get all recent posts and comments by a specific user. Replace 'spez' with any username.\n\nReturns ~25 most recent items. This is the PRIMARY endpoint for building user personas."
+					}
+				},
+				{
+					"name": "1.5 User comments only",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "User-Agent",
+								"value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) CommunityMindMirror/1.0"
+							}
+						],
+						"url": {
+							"raw": "https://www.reddit.com/user/spez/comments/.rss",
+							"protocol": "https",
+							"host": ["www", "reddit", "com"],
+							"path": ["user", "spez", "comments", ".rss"]
+						},
+						"description": "Only comments by this user (no submissions). Comments reveal opinions better than posts."
+					}
+				},
+				{
+					"name": "1.6 User submissions only",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "User-Agent",
+								"value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) CommunityMindMirror/1.0"
+							}
+						],
+						"url": {
+							"raw": "https://www.reddit.com/user/spez/submitted/.rss",
+							"protocol": "https",
+							"host": ["www", "reddit", "com"],
+							"path": ["user", "spez", "submitted", ".rss"]
+						}
+					}
+				},
+				{
+					"name": "1.7 Combined subreddits",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "User-Agent",
+								"value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) CommunityMindMirror/1.0"
+							}
+						],
+						"url": {
+							"raw": "https://www.reddit.com/r/artificial+MachineLearning+LocalLLaMA/top/.rss?sort=top&t=week&limit=100",
+							"protocol": "https",
+							"host": ["www", "reddit", "com"],
+							"path": ["r", "artificial+MachineLearning+LocalLLaMA", "top", ".rss"],
+							"query": [
+								{"key": "sort", "value": "top"},
+								{"key": "t", "value": "week"},
+								{"key": "limit", "value": "100"}
+							]
+						},
+						"description": "Combine multiple subreddits with + sign. Useful for pulling AI community posts in one call."
+					}
+				},
+				{
+					"name": "1.8 Search Reddit",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "User-Agent",
+								"value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) CommunityMindMirror/1.0"
+							}
+						],
+						"url": {
+							"raw": "https://www.reddit.com/search.rss?q=AI+agents+startup&sort=new&limit=100",
+							"protocol": "https",
+							"host": ["www", "reddit", "com"],
+							"path": ["search.rss"],
+							"query": [
+								{"key": "q", "value": "AI+agents+startup"},
+								{"key": "sort", "value": "new", "description": "relevance, hot, top, new, comments"},
+								{"key": "limit", "value": "100"}
+							]
+						},
+						"description": "Search across all of Reddit. Good for finding discussions on specific topics."
+					}
+				},
+				{
+					"name": "1.9 Post comments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "User-Agent",
+								"value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) CommunityMindMirror/1.0"
+							}
+						],
+						"url": {
+							"raw": "https://www.reddit.com/r/artificial/comments/POST_ID/.rss",
+							"protocol": "https",
+							"host": ["www", "reddit", "com"],
+							"path": ["r", "artificial", "comments", "POST_ID", ".rss"]
+						},
+						"description": "Get all comments on a specific post. Replace POST_ID with the 6-character post ID from the post URL."
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Hacker News API",
+			"description": "No registration needed. No API key. No rate limit.\n\nBase URL: https://hacker-news.firebaseio.com/v0/\nReturns: JSON\nDocs: https://github.com/HackerNews/API",
+			"item": [
+				{
+					"name": "2.1 Top stories (IDs)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hacker-news.firebaseio.com/v0/topstories.json?print=pretty",
+							"protocol": "https",
+							"host": ["hacker-news", "firebaseio", "com"],
+							"path": ["v0", "topstories.json"],
+							"query": [
+								{"key": "print", "value": "pretty"}
+							]
+						},
+						"description": "Returns array of up to 500 top story IDs. Use these IDs to fetch individual stories."
+					}
+				},
+				{
+					"name": "2.2 Best stories (IDs)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hacker-news.firebaseio.com/v0/beststories.json?print=pretty",
+							"protocol": "https",
+							"host": ["hacker-news", "firebaseio", "com"],
+							"path": ["v0", "beststories.json"],
+							"query": [
+								{"key": "print", "value": "pretty"}
+							]
+						}
+					}
+				},
+				{
+					"name": "2.3 New stories (IDs)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hacker-news.firebaseio.com/v0/newstories.json?print=pretty",
+							"protocol": "https",
+							"host": ["hacker-news", "firebaseio", "com"],
+							"path": ["v0", "newstories.json"],
+							"query": [
+								{"key": "print", "value": "pretty"}
+							]
+						}
+					}
+				},
+				{
+					"name": "2.4 Ask HN stories (IDs)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hacker-news.firebaseio.com/v0/askstories.json?print=pretty",
+							"protocol": "https",
+							"host": ["hacker-news", "firebaseio", "com"],
+							"path": ["v0", "askstories.json"],
+							"query": [
+								{"key": "print", "value": "pretty"}
+							]
+						},
+						"description": "Ask HN posts — great for understanding community questions and concerns."
+					}
+				},
+				{
+					"name": "2.5 Show HN stories (IDs)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hacker-news.firebaseio.com/v0/showstories.json?print=pretty",
+							"protocol": "https",
+							"host": ["hacker-news", "firebaseio", "com"],
+							"path": ["v0", "showstories.json"],
+							"query": [
+								{"key": "print", "value": "pretty"}
+							]
+						},
+						"description": "Show HN posts — what people are building."
+					}
+				},
+				{
+					"name": "2.6 Job stories (IDs)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hacker-news.firebaseio.com/v0/jobstories.json?print=pretty",
+							"protocol": "https",
+							"host": ["hacker-news", "firebaseio", "com"],
+							"path": ["v0", "jobstories.json"],
+							"query": [
+								{"key": "print", "value": "pretty"}
+							]
+						},
+						"description": "Job postings on HN — shows what YC/startup companies are hiring for."
+					}
+				},
+				{
+					"name": "2.7 Get single item (story/comment/job)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hacker-news.firebaseio.com/v0/item/8863.json?print=pretty",
+							"protocol": "https",
+							"host": ["hacker-news", "firebaseio", "com"],
+							"path": ["v0", "item", "8863.json"],
+							"query": [
+								{"key": "print", "value": "pretty"}
+							]
+						},
+						"description": "Fetch a single item by ID. Works for stories, comments, jobs, polls.\n\nResponse includes:\n- by: username\n- text: content (for comments)\n- title: title (for stories)\n- kids: array of child comment IDs\n- score: upvotes\n- time: unix timestamp\n- type: story/comment/job/poll\n- url: linked URL (for stories)\n\nTo get comments: fetch story → get 'kids' array → fetch each kid ID → recursively get their 'kids'"
+					}
+				},
+				{
+					"name": "2.8 Get user profile",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hacker-news.firebaseio.com/v0/user/jl.json?print=pretty",
+							"protocol": "https",
+							"host": ["hacker-news", "firebaseio", "com"],
+							"path": ["v0", "user", "jl.json"],
+							"query": [
+								{"key": "print", "value": "pretty"}
+							]
+						},
+						"description": "Get user profile. Replace 'jl' with any username.\n\nResponse includes:\n- about: user bio\n- karma: total karma score\n- created: account creation (unix timestamp)\n- submitted: array of ALL their story/comment IDs (this is the key field for building personas)"
+					}
+				},
+				{
+					"name": "2.9 Max item ID",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hacker-news.firebaseio.com/v0/maxitem.json",
+							"protocol": "https",
+							"host": ["hacker-news", "firebaseio", "com"],
+							"path": ["v0", "maxitem.json"]
+						},
+						"description": "Returns the current largest item ID. Useful for polling new items."
+					}
+				},
+				{
+					"name": "2.10 Recent updates (changed items + profiles)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hacker-news.firebaseio.com/v0/updates.json?print=pretty",
+							"protocol": "https",
+							"host": ["hacker-news", "firebaseio", "com"],
+							"path": ["v0", "updates.json"],
+							"query": [
+								{"key": "print", "value": "pretty"}
+							]
+						},
+						"description": "Returns recently changed item IDs and user profiles. Good for real-time monitoring."
+					}
+				},
+				{
+					"name": "2.11 Algolia HN Search — Stories",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hn.algolia.com/api/v1/search?query=AI+agents&tags=story&numericFilters=created_at_i>1700000000&hitsPerPage=50",
+							"protocol": "https",
+							"host": ["hn", "algolia", "com"],
+							"path": ["api", "v1", "search"],
+							"query": [
+								{"key": "query", "value": "AI+agents"},
+								{"key": "tags", "value": "story", "description": "story, comment, show_hn, ask_hn, poll"},
+								{"key": "numericFilters", "value": "created_at_i>1700000000", "description": "Unix timestamp filter. 1700000000 = Nov 2023"},
+								{"key": "hitsPerPage", "value": "50", "description": "Max 1000"}
+							]
+						},
+						"description": "Algolia-powered HN search. MUCH faster than Firebase for keyword searches.\n\nNo registration needed. Better for searching by keyword/topic.\nDocs: https://hn.algolia.com/api"
+					}
+				},
+				{
+					"name": "2.12 Algolia HN Search — Comments",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hn.algolia.com/api/v1/search?query=AI+agents&tags=comment&hitsPerPage=50",
+							"protocol": "https",
+							"host": ["hn", "algolia", "com"],
+							"path": ["api", "v1", "search"],
+							"query": [
+								{"key": "query", "value": "AI+agents"},
+								{"key": "tags", "value": "comment"},
+								{"key": "hitsPerPage", "value": "50"}
+							]
+						},
+						"description": "Search HN comments by keyword. Great for finding opinions on specific topics."
+					}
+				},
+				{
+					"name": "2.13 Algolia HN Search — By date",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hn.algolia.com/api/v1/search_by_date?query=LLM+startup&tags=story&hitsPerPage=50",
+							"protocol": "https",
+							"host": ["hn", "algolia", "com"],
+							"path": ["api", "v1", "search_by_date"],
+							"query": [
+								{"key": "query", "value": "LLM+startup"},
+								{"key": "tags", "value": "story"},
+								{"key": "hitsPerPage", "value": "50"}
+							]
+						},
+						"description": "Same as search but sorted by date (newest first). Use for monitoring recent discussions."
+					}
+				},
+				{
+					"name": "2.14 Algolia HN — User's items",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://hn.algolia.com/api/v1/search?tags=author_pg&hitsPerPage=50",
+							"protocol": "https",
+							"host": ["hn", "algolia", "com"],
+							"path": ["api", "v1", "search"],
+							"query": [
+								{"key": "tags", "value": "author_pg", "description": "Replace 'pg' with any username. Format: author_{username}"},
+								{"key": "hitsPerPage", "value": "50"}
+							]
+						},
+						"description": "Get all items by a specific user via Algolia. Replace 'pg' with any HN username.\n\nMuch faster than fetching each item ID from the Firebase user.submitted array."
+					}
+				}
+			]
+		},
+		{
+			"name": "3. YouTube Data API v3",
+			"description": "REGISTRATION REQUIRED:\n1. Go to https://console.cloud.google.com\n2. Create a new project (or select existing)\n3. Go to APIs & Services → Library\n4. Search 'YouTube Data API v3' → Enable it\n5. Go to APIs & Services → Credentials\n6. Click 'Create Credentials' → API Key\n7. Copy the key and set it as YOUTUBE_API_KEY variable\n\nQuota: 10,000 units/day (free)\n- Search: 100 units per call\n- Video details: 1 unit per call\n- Comment threads: 1 unit per call\n- Channel details: 1 unit per call",
+			"item": [
+				{
+					"name": "3.1 Search videos by keyword",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://www.googleapis.com/youtube/v3/search?part=snippet&q=AI+agents+2026&type=video&maxResults=25&order=date&key={{YOUTUBE_API_KEY}}",
+							"protocol": "https",
+							"host": ["www", "googleapis", "com"],
+							"path": ["youtube", "v3", "search"],
+							"query": [
+								{"key": "part", "value": "snippet"},
+								{"key": "q", "value": "AI+agents+2026"},
+								{"key": "type", "value": "video"},
+								{"key": "maxResults", "value": "25", "description": "Max 50"},
+								{"key": "order", "value": "date", "description": "date, rating, relevance, title, videoCount, viewCount"},
+								{"key": "key", "value": "{{YOUTUBE_API_KEY}}"}
+							]
+						},
+						"description": "Search YouTube videos. COSTS 100 QUOTA UNITS per call.\n\nUse sparingly — you get 100 searches per day with default quota."
+					}
+				},
+				{
+					"name": "3.2 Channel videos (by channel ID)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=UCbfYPyITQ-7l4upoX8nvctg&type=video&maxResults=25&order=date&key={{YOUTUBE_API_KEY}}",
+							"protocol": "https",
+							"host": ["www", "googleapis", "com"],
+							"path": ["youtube", "v3", "search"],
+							"query": [
+								{"key": "part", "value": "snippet"},
+								{"key": "channelId", "value": "UCbfYPyITQ-7l4upoX8nvctg", "description": "Two Minute Papers channel ID"},
+								{"key": "type", "value": "video"},
+								{"key": "maxResults", "value": "25"},
+								{"key": "order", "value": "date"},
+								{"key": "key", "value": "{{YOUTUBE_API_KEY}}"}
+							]
+						},
+						"description": "Get recent videos from a specific channel. 100 quota units."
+					}
+				},
+				{
+					"name": "3.3 Video details (stats, description)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=VIDEO_ID_HERE&key={{YOUTUBE_API_KEY}}",
+							"protocol": "https",
+							"host": ["www", "googleapis", "com"],
+							"path": ["youtube", "v3", "videos"],
+							"query": [
+								{"key": "part", "value": "snippet,statistics,contentDetails"},
+								{"key": "id", "value": "VIDEO_ID_HERE", "description": "Comma-separated video IDs (up to 50)"},
+								{"key": "key", "value": "{{YOUTUBE_API_KEY}}"}
+							]
+						},
+						"description": "Get full details for videos. Only 1 quota unit per call.\n\nYou can batch up to 50 video IDs in one call (comma-separated).\nReturns: title, description, view count, like count, comment count, duration, tags."
+					}
+				},
+				{
+					"name": "3.4 Video comment threads",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://www.googleapis.com/youtube/v3/commentThreads?part=snippet,replies&videoId=VIDEO_ID_HERE&maxResults=100&order=relevance&key={{YOUTUBE_API_KEY}}",
+							"protocol": "https",
+							"host": ["www", "googleapis", "com"],
+							"path": ["youtube", "v3", "commentThreads"],
+							"query": [
+								{"key": "part", "value": "snippet,replies"},
+								{"key": "videoId", "value": "VIDEO_ID_HERE"},
+								{"key": "maxResults", "value": "100", "description": "Max 100"},
+								{"key": "order", "value": "relevance", "description": "relevance or time"},
+								{"key": "key", "value": "{{YOUTUBE_API_KEY}}"}
+							]
+						},
+						"description": "Get top comments on a video. 1 quota unit.\n\nReturns: comment text, author, like count, reply count.\nUse nextPageToken for pagination."
+					}
+				},
+				{
+					"name": "3.5 Channel details",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=UCbfYPyITQ-7l4upoX8nvctg&key={{YOUTUBE_API_KEY}}",
+							"protocol": "https",
+							"host": ["www", "googleapis", "com"],
+							"path": ["youtube", "v3", "channels"],
+							"query": [
+								{"key": "part", "value": "snippet,statistics,contentDetails"},
+								{"key": "id", "value": "UCbfYPyITQ-7l4upoX8nvctg", "description": "Channel ID"},
+								{"key": "key", "value": "{{YOUTUBE_API_KEY}}"}
+							]
+						},
+						"description": "Get channel info. 1 quota unit.\nReturns: subscriber count, total views, video count, description."
+					}
+				},
+				{
+					"name": "3.6 Channel RSS (NO API key needed)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://www.youtube.com/feeds/videos.xml?channel_id=UCbfYPyITQ-7l4upoX8nvctg",
+							"protocol": "https",
+							"host": ["www", "youtube", "com"],
+							"path": ["feeds", "videos.xml"],
+							"query": [
+								{"key": "channel_id", "value": "UCbfYPyITQ-7l4upoX8nvctg"}
+							]
+						},
+						"description": "FREE — No API key, no quota cost. Gets latest ~15 videos from a channel.\n\nReturns: Atom XML with video ID, title, published date, description.\nUse this to discover video IDs, then use the API only for comments/stats.\n\nSAVES MASSIVE QUOTA — use this instead of search for known channels."
+					}
+				}
+			]
+		},
+		{
+			"name": "4. News RSS Feeds",
+			"description": "No registration needed. No API key. No rate limits.\n\nAll RSS feeds return XML (Atom or RSS 2.0).\nParse with feedparser (Python) or any XML parser.",
+			"item": [
+				{
+					"name": "4.1 TechCrunch",
+					"request": {
+						"method": "GET",
+						"url": "https://techcrunch.com/feed/"
+					}
+				},
+				{
+					"name": "4.2 The Verge",
+					"request": {
+						"method": "GET",
+						"url": "https://www.theverge.com/rss/index.xml"
+					}
+				},
+				{
+					"name": "4.3 Ars Technica",
+					"request": {
+						"method": "GET",
+						"url": "https://feeds.arstechnica.com/arstechnica/index"
+					}
+				},
+				{
+					"name": "4.4 Wired",
+					"request": {
+						"method": "GET",
+						"url": "https://www.wired.com/feed/rss"
+					}
+				},
+				{
+					"name": "4.5 MIT Technology Review",
+					"request": {
+						"method": "GET",
+						"url": "https://www.technologyreview.com/feed/"
+					}
+				},
+				{
+					"name": "4.6 VentureBeat",
+					"request": {
+						"method": "GET",
+						"url": "https://venturebeat.com/feed/"
+					}
+				},
+				{
+					"name": "4.7 The Robot Report",
+					"request": {
+						"method": "GET",
+						"url": "https://www.therobotreport.com/feed/"
+					}
+				},
+				{
+					"name": "4.8 Google News — AI search",
+					"request": {
+						"method": "GET",
+						"url": "https://news.google.com/rss/search?q=artificial+intelligence+startup&hl=en-US&gl=US&ceid=US:en"
+					},
+					"description": "Google News RSS for any search query. Change q= parameter for different topics."
+				},
+				{
+					"name": "4.9 Google News — LLM",
+					"request": {
+						"method": "GET",
+						"url": "https://news.google.com/rss/search?q=large+language+model&hl=en-US&gl=US&ceid=US:en"
+					}
+				},
+				{
+					"name": "4.10 Google News — AI agents",
+					"request": {
+						"method": "GET",
+						"url": "https://news.google.com/rss/search?q=AI+agents+automation&hl=en-US&gl=US&ceid=US:en"
+					}
+				},
+				{
+					"name": "4.11 Google News — Startup funding",
+					"request": {
+						"method": "GET",
+						"url": "https://news.google.com/rss/search?q=startup+funding+series+round&hl=en-US&gl=US&ceid=US:en"
+					}
+				},
+				{
+					"name": "4.12 Google News — Robotics",
+					"request": {
+						"method": "GET",
+						"url": "https://news.google.com/rss/search?q=robotics+AI+startup&hl=en-US&gl=US&ceid=US:en"
+					}
+				},
+				{
+					"name": "4.13 Hacker News RSS (via hnrss.org)",
+					"request": {
+						"method": "GET",
+						"url": "https://hnrss.org/newest?points=50&q=AI"
+					},
+					"description": "HN stories as RSS, filtered by points and keyword. No registration needed.\n\nParams: points= (min score), q= (keyword), count= (max items)"
+				}
+			]
+		},
+		{
+			"name": "5. ArXiv API",
+			"description": "No registration needed. No API key.\n\nRate limit: 1 request per 3 seconds (be polite).\nReturns: Atom XML.\nMax 2000 results per page, 30000 total per query.\nDocs: https://info.arxiv.org/help/api/user-manual.html",
+			"item": [
+				{
+					"name": "5.1 Search — AI papers (recent)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://export.arxiv.org/api/query?search_query=cat:cs.AI&sortBy=submittedDate&sortOrder=descending&start=0&max_results=50",
+							"protocol": "https",
+							"host": ["export", "arxiv", "org"],
+							"path": ["api", "query"],
+							"query": [
+								{"key": "search_query", "value": "cat:cs.AI", "description": "Category: cs.AI (Artificial Intelligence)"},
+								{"key": "sortBy", "value": "submittedDate", "description": "relevance, lastUpdatedDate, submittedDate"},
+								{"key": "sortOrder", "value": "descending"},
+								{"key": "start", "value": "0", "description": "Pagination offset"},
+								{"key": "max_results", "value": "50", "description": "Max 2000 per request"}
+							]
+						},
+						"description": "Get recent AI papers. Returns Atom XML with title, abstract, authors, categories, published date."
+					}
+				},
+				{
+					"name": "5.2 Search — Machine Learning",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://export.arxiv.org/api/query?search_query=cat:cs.LG&sortBy=submittedDate&sortOrder=descending&start=0&max_results=50",
+							"protocol": "https",
+							"host": ["export", "arxiv", "org"],
+							"path": ["api", "query"],
+							"query": [
+								{"key": "search_query", "value": "cat:cs.LG"},
+								{"key": "sortBy", "value": "submittedDate"},
+								{"key": "sortOrder", "value": "descending"},
+								{"key": "start", "value": "0"},
+								{"key": "max_results", "value": "50"}
+							]
+						}
+					}
+				},
+				{
+					"name": "5.3 Search — NLP / Computation & Language",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://export.arxiv.org/api/query?search_query=cat:cs.CL&sortBy=submittedDate&sortOrder=descending&start=0&max_results=50",
+							"protocol": "https",
+							"host": ["export", "arxiv", "org"],
+							"path": ["api", "query"],
+							"query": [
+								{"key": "search_query", "value": "cat:cs.CL"},
+								{"key": "sortBy", "value": "submittedDate"},
+								{"key": "sortOrder", "value": "descending"},
+								{"key": "start", "value": "0"},
+								{"key": "max_results", "value": "50"}
+							]
+						}
+					}
+				},
+				{
+					"name": "5.4 Search — Robotics",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://export.arxiv.org/api/query?search_query=cat:cs.RO&sortBy=submittedDate&sortOrder=descending&start=0&max_results=50",
+							"protocol": "https",
+							"host": ["export", "arxiv", "org"],
+							"path": ["api", "query"],
+							"query": [
+								{"key": "search_query", "value": "cat:cs.RO"},
+								{"key": "sortBy", "value": "submittedDate"},
+								{"key": "sortOrder", "value": "descending"},
+								{"key": "start", "value": "0"},
+								{"key": "max_results", "value": "50"}
+							]
+						}
+					}
+				},
+				{
+					"name": "5.5 Search — Multi-Agent Systems",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://export.arxiv.org/api/query?search_query=cat:cs.MA&sortBy=submittedDate&sortOrder=descending&start=0&max_results=50",
+							"protocol": "https",
+							"host": ["export", "arxiv", "org"],
+							"path": ["api", "query"],
+							"query": [
+								{"key": "search_query", "value": "cat:cs.MA"},
+								{"key": "sortBy", "value": "submittedDate"},
+								{"key": "sortOrder", "value": "descending"},
+								{"key": "start", "value": "0"},
+								{"key": "max_results", "value": "50"}
+							]
+						}
+					}
+				},
+				{
+					"name": "5.6 Search — Multiple categories combined",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://export.arxiv.org/api/query?search_query=(cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.CL+OR+cat:cs.MA)+AND+ti:agent&sortBy=submittedDate&sortOrder=descending&start=0&max_results=50",
+							"protocol": "https",
+							"host": ["export", "arxiv", "org"],
+							"path": ["api", "query"],
+							"query": [
+								{"key": "search_query", "value": "(cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.CL+OR+cat:cs.MA)+AND+ti:agent"},
+								{"key": "sortBy", "value": "submittedDate"},
+								{"key": "sortOrder", "value": "descending"},
+								{"key": "start", "value": "0"},
+								{"key": "max_results", "value": "50"}
+							]
+						},
+						"description": "Combine categories with OR and filter by title keyword.\n\nQuery prefixes:\n- cat: = category\n- ti: = title\n- au: = author\n- abs: = abstract\n- all: = all fields\n\nBoolean: AND, OR, ANDNOT"
+					}
+				},
+				{
+					"name": "5.7 Search — By keyword in title",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://export.arxiv.org/api/query?search_query=ti:transformer+AND+ti:attention&sortBy=submittedDate&sortOrder=descending&start=0&max_results=25",
+							"protocol": "https",
+							"host": ["export", "arxiv", "org"],
+							"path": ["api", "query"],
+							"query": [
+								{"key": "search_query", "value": "ti:transformer+AND+ti:attention"},
+								{"key": "sortBy", "value": "submittedDate"},
+								{"key": "sortOrder", "value": "descending"},
+								{"key": "start", "value": "0"},
+								{"key": "max_results", "value": "25"}
+							]
+						}
+					}
+				},
+				{
+					"name": "5.8 Get paper by ID",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "https://export.arxiv.org/api/query?id_list=2411.11581",
+							"protocol": "https",
+							"host": ["export", "arxiv", "org"],
+							"path": ["api", "query"],
+							"query": [
+								{"key": "id_list", "value": "2411.11581", "description": "OASIS paper ID. Comma-separate for multiple."}
+							]
+						},
+						"description": "Fetch specific paper(s) by ArXiv ID."
+					}
+				}
+			]
+		}
+	]
+}
