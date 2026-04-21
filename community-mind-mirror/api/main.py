@@ -9,8 +9,9 @@ import structlog
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy import select, func, text
@@ -140,6 +141,42 @@ async def trigger_pipeline():
         return {"status": "already_running", "message": "Pipeline is already in progress."}
     asyncio.create_task(run_pipeline())
     return {"status": "started", "message": "Pipeline triggered. Check logs for progress."}
+
+
+class RunScrapersRequest(BaseModel):
+    scrapers: list[str]
+
+
+@app.post("/api/scrapers/run")
+async def run_scrapers_endpoint(req: RunScrapersRequest, background_tasks: BackgroundTasks):
+    """Run specific scrapers by name without triggering the full pipeline."""
+    from run_scrapers_bg import run_scrapers, get_scraper, SCRAPER_ORDER
+    unknown = [s for s in req.scrapers if s not in SCRAPER_ORDER]
+    if unknown:
+        return {"status": "error", "message": f"Unknown scrapers: {unknown}"}
+
+    async def _run():
+        import time
+        results = {}
+        for name in req.scrapers:
+            t0 = time.time()
+            try:
+                scraper = get_scraper(name)
+                await asyncio.wait_for(scraper.run(), timeout=600)
+                results[name] = {
+                    "status": "ok",
+                    "fetched": scraper.records_fetched,
+                    "new": scraper.records_new,
+                    "duration_s": round(time.time() - t0, 1),
+                }
+            except asyncio.TimeoutError:
+                results[name] = {"status": "timeout", "error": "Timed out after 600s"}
+            except Exception as e:
+                results[name] = {"status": "error", "error": str(e)}
+        return results
+
+    background_tasks.add_task(_run)
+    return {"status": "started", "scrapers": req.scrapers, "message": f"Running {len(req.scrapers)} scrapers in background."}
 
 
 @app.get("/api/pipeline/status")
