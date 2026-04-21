@@ -24,9 +24,12 @@ TECH_QUERIES = [
     "mobile app Flutter", "computer vision", "NLP model",
     "RAG chatbot", "fine tuning", "vector database",
     "n8n automation", "Zapier workflow",
+    "website development", "app development", "API integration",
+    "data analysis", "automation script", "software development",
 ]
 
 # Skills that classify a project as tech-related (post-filter)
+# NOTE: broad set so we don't accidentally discard valid projects
 TECH_SKILLS = {
     "python", "javascript", "typescript", "react", "node.js", "php", "java",
     "c++", "rust", "golang", "swift", "flutter", "kotlin", "django", "fastapi",
@@ -37,10 +40,21 @@ TECH_SKILLS = {
     "aws", "gcp", "azure", "docker", "kubernetes", "devops",
     "api", "scraping", "automation", "chatbot", "mobile app development",
     "android", "ios", "full stack development",
+    # Broad web / software categories (cover what Freelancer skill tags use)
+    "web development", "website design", "html", "css", "wordpress",
+    "shopify", "woocommerce", "laravel", "django", "vue.js", "angular",
+    "ios development", "android development", "app development",
+    "software development", "software architecture", "microservices",
+    "data entry", "data processing", "excel", "vba",
+    "graphic design", "ui/ux", "figma",
 }
 
 
 def _is_tech_project(skills: list[str]) -> bool:
+    if not skills:
+        # If no skills returned by API, accept the project anyway
+        # (we already filtered by tech query, so it's likely relevant)
+        return True
     skills_lower = {s.lower() for s in skills}
     return bool(skills_lower & TECH_SKILLS)
 
@@ -66,10 +80,9 @@ class FreelancerScraper(BaseScraper):
                         f"{BASE_URL}/projects/active/",
                         params={
                             "q": query,
-                            "limit": 50,
+                            "limit": 100,
                             "job_details": "true",
                             "full_description": "true",
-                            "compact": "true",
                         },
                         headers={"User-Agent": "Mozilla/5.0"},
                     )

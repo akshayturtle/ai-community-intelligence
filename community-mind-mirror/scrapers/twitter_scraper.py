@@ -1,192 +1,165 @@
-"""X.com (Twitter) scraper — uses residential proxies (DataImpulse).
+"""X.com (Twitter) scraper — Nitter instance scraping (no API key needed).
 
-Scrapes public search results for AI/tech project discussions, job posts,
-freelance opportunities, and tool launches — without needing API auth.
-Uses Twitter's internal Explore/search API endpoint.
+Uses public Nitter mirrors (privacy-friendly Twitter frontends that render
+plain HTML). Falls back through multiple instances automatically.
 
-Requires: DATAIMPULSE_HOST, DATAIMPULSE_PORT, DATAIMPULSE_USER, DATAIMPULSE_PASS
+No API credentials required. Set TWITTER_BEARER_TOKEN env var to use the
+official Twitter API v2 instead (preferred if available).
 """
 
-import json
+import asyncio
+import os
 import re
 from datetime import datetime, timezone
+from urllib.parse import quote
 
+import httpx
 import structlog
 
 from scrapers.base_scraper import BaseScraper
-from scrapers.proxy import proxy_client, random_headers, json_headers, is_configured
+from scrapers.proxy import random_headers
 
 logger = structlog.get_logger()
 
-# High-signal search queries for market intelligence
+# Nitter instances — tried in order, first working one is used
+NITTER_INSTANCES = [
+    "https://nitter.privacydev.net",
+    "https://nitter.poast.org",
+    "https://nitter.1d4.us",
+    "https://nitter.kavin.rocks",
+    "https://nitter.mint.lgbt",
+    "https://nitter.cz",
+]
+
 SEARCH_QUERIES = [
-    # Freelance project signals
-    "hiring developer site:x.com",
-    "looking for AI engineer",
+    # Freelance/hiring signals
+    "looking for AI engineer freelance",
     "need Python developer DM",
-    # AI product launches
+    "hiring AI developer remote",
+    # Product launches
     "#buildinpublic AI agent",
     "just launched AI tool",
-    "new AI wrapper",
-    # Market demand
-    "AI automation budget",
-    "LLM project scope",
-    "need ML engineer freelance",
-    # Tech trends
-    "#AI #hiring remote",
-    "building with Claude OR GPT-4 launch",
     "shipped AI feature",
+    # Market intelligence
+    "AI automation tool",
+    "LLM wrapper launch",
+    "#indiehacker AI",
+    # Tech trends
+    "RAG system production",
+    "fine tuning results",
+    "GPT-4 vs Claude comparison",
 ]
 
-GUEST_TOKEN_URL = "https://api.twitter.com/1.1/guest/activate.json"
-SEARCH_URL = "https://twitter.com/i/api/2/search/adaptive.json"
-
-# Twitter Bearer token (public, embedded in the web app — rotate if blocked)
-_BEARER_TOKENS = [
-    "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA",
-]
+# Official API v2 search endpoint
+TWITTER_V2_URL = "https://api.twitter.com/2/tweets/search/recent"
 
 
 class TwitterScraper(BaseScraper):
     """
-    Scrapes X.com (Twitter) public search for AI/tech/freelance signals.
-    Uses the web app's guest token flow — no developer account needed.
+    Scrapes X.com for AI/tech/freelance signals.
+    Primary: official Twitter API v2 (requires TWITTER_BEARER_TOKEN env var)
+    Fallback: Nitter public instances (no credentials needed)
     """
 
     def __init__(self):
-        super().__init__(scraper_name="twitter_scraper", request_delay=3.0)
-        self._guest_token: str = ""
-        self._bearer: str = _BEARER_TOKENS[0]
+        super().__init__(scraper_name="twitter_scraper", request_delay=2.0)
+        self._bearer: str = os.getenv("TWITTER_BEARER_TOKEN", "")
+        self._nitter_base: str = ""
 
     async def scrape(self, **kwargs):
-        if not is_configured():
-            self.log.warning(
-                "twitter_no_proxy",
-                hint="Set DATAIMPULSE_* env vars to enable Twitter scraping.",
-            )
-            return
-
         seen_ids: set[str] = set()
 
-        async with proxy_client(timeout=30.0) as client:
-            # Acquire a guest token first
-            self._guest_token = await self._get_guest_token(client)
-            if not self._guest_token:
-                self.log.warning("twitter_no_guest_token")
-                return
+        async with httpx.AsyncClient(
+            timeout=30.0,
+            follow_redirects=True,
+            verify=False,
+        ) as client:
+            if self._bearer:
+                # Use official v2 API
+                await self._scrape_v2(client, seen_ids)
+            else:
+                # Find a working Nitter instance then scrape
+                self._nitter_base = await self._find_nitter(client)
+                if not self._nitter_base:
+                    self.log.warning(
+                        "twitter_no_source",
+                        hint=(
+                            "All Nitter instances unreachable and no TWITTER_BEARER_TOKEN set. "
+                            "Add TWITTER_BEARER_TOKEN to app settings for reliable scraping."
+                        ),
+                    )
+                    return
+                await self._scrape_nitter(client, seen_ids)
 
-            for query in SEARCH_QUERIES:
-                await self.rate_limit()
-                tweets = await self._search(client, query)
-                for tweet in tweets:
-                    tid = str(tweet.get("id_str") or tweet.get("id") or "")
+    # ── Official v2 API ──────────────────────────────────────────────────────
+
+    async def _scrape_v2(self, client: httpx.AsyncClient, seen_ids: set[str]):
+        headers = {
+            "Authorization": f"Bearer {self._bearer}",
+            "User-Agent": "v2RecentSearchPython",
+        }
+        for query in SEARCH_QUERIES:
+            await self.rate_limit()
+            try:
+                resp = await client.get(
+                    TWITTER_V2_URL,
+                    params={
+                        "query": f"{query} lang:en -is:retweet",
+                        "max_results": 100,
+                        "tweet.fields": "created_at,public_metrics,author_id,entities",
+                        "expansions": "author_id",
+                        "user.fields": "username,name,public_metrics,verified",
+                    },
+                    headers=headers,
+                )
+                if resp.status_code == 429:
+                    self.log.warning("twitter_v2_rate_limit", query=query)
+                    await asyncio.sleep(15)
+                    continue
+                if resp.status_code != 200:
+                    self.log.warning("twitter_v2_failed", query=query, status=resp.status_code)
+                    continue
+
+                data = resp.json()
+                users_by_id = {
+                    u["id"]: u
+                    for u in (data.get("includes") or {}).get("users", [])
+                }
+                for tweet in data.get("data") or []:
+                    tid = tweet.get("id", "")
                     if not tid or tid in seen_ids:
                         continue
                     seen_ids.add(tid)
-                    await self._store_tweet(tweet, query)
+                    user = users_by_id.get(tweet.get("author_id", ""), {})
+                    await self._store_tweet_v2(tweet, user, query)
 
-    async def _get_guest_token(self, client) -> str:
-        try:
-            resp = await client.post(
-                GUEST_TOKEN_URL,
-                headers={
-                    **json_headers(),
-                    "Authorization": f"Bearer {self._bearer}",
-                },
-            )
-            return resp.json().get("guest_token", "")
-        except Exception as e:
-            self.log.warning("twitter_guest_token_failed", error=str(e))
-            return ""
+            except Exception as e:
+                self.log.warning("twitter_v2_error", query=query, error=str(e))
 
-    async def _search(self, client, query: str) -> list[dict]:
-        try:
-            resp = await client.get(
-                SEARCH_URL,
-                params={
-                    "q": query,
-                    "count": 40,
-                    "result_filter": "Top",
-                    "tweet_mode": "extended",
-                },
-                headers={
-                    **json_headers(referer="https://twitter.com/search"),
-                    "Authorization": f"Bearer {self._bearer}",
-                    "x-guest-token": self._guest_token,
-                    "x-twitter-client-language": "en",
-                    "x-twitter-active-user": "yes",
-                },
-            )
-
-            if resp.status_code != 200:
-                self.log.warning("twitter_search_failed", query=query, status=resp.status_code)
-                return []
-
-            data = resp.json()
-            tweets = []
-
-            # Parse adaptive search timeline
-            timeline = data.get("timeline", {})
-            instructions = timeline.get("instructions", [])
-            for instr in instructions:
-                for entry in instr.get("addEntries", {}).get("entries", []):
-                    content = entry.get("content", {})
-                    item = content.get("item", {})
-                    tweet_results = item.get("content", {}).get("tweet_results", {})
-                    result = tweet_results.get("result", {})
-                    legacy = result.get("legacy") or result.get("tweet", {}).get("legacy", {})
-                    if legacy and legacy.get("full_text"):
-                        legacy["id_str"] = result.get("rest_id") or legacy.get("id_str", "")
-                        legacy["user"] = result.get("core", {}).get("user_results", {}).get("result", {}).get("legacy", {})
-                        tweets.append(legacy)
-
-            # Fallback for older response format
-            if not tweets:
-                global_objects = data.get("globalObjects", {})
-                tweets_obj = global_objects.get("tweets", {})
-                users_obj  = global_objects.get("users", {})
-                for tid, tw in tweets_obj.items():
-                    user_id = str(tw.get("user_id_str") or tw.get("user_id") or "")
-                    tw["user"] = users_obj.get(user_id, {})
-                    tweets.append(tw)
-
-            return tweets
-
-        except Exception as e:
-            self.log.warning("twitter_search_error", query=query, error=str(e))
-            return []
-
-    async def _store_tweet(self, tweet: dict, query: str):
-        text = tweet.get("full_text") or tweet.get("text") or ""
-        if not text or len(text) < 30:
+    async def _store_tweet_v2(self, tweet: dict, user: dict, query: str):
+        text = tweet.get("text", "")
+        if not text or len(text) < 20:
             return
 
-        tid      = str(tweet.get("id_str") or tweet.get("id") or "")
-        user     = tweet.get("user") or {}
-        username = user.get("screen_name") or user.get("name") or "unknown"
-        name     = user.get("name") or username
-        followers = user.get("followers_count") or 0
-        verified  = user.get("verified") or user.get("is_blue_verified") or False
+        tid      = tweet.get("id", "")
+        username = user.get("username") or user.get("name") or "unknown"
+        metrics  = tweet.get("public_metrics") or {}
+        likes    = metrics.get("like_count", 0)
+        retweets = metrics.get("retweet_count", 0)
+        replies  = metrics.get("reply_count", 0)
+        followers = (user.get("public_metrics") or {}).get("followers_count", 0)
+        verified  = user.get("verified") or False
 
-        likes    = tweet.get("favorite_count") or 0
-        retweets = tweet.get("retweet_count") or 0
-        replies  = tweet.get("reply_count") or 0
-
-        url = f"https://x.com/{username}/status/{tid}" if tid and username != "unknown" else ""
-
-        created_raw = tweet.get("created_at") or ""
         try:
-            created_at = datetime.strptime(created_raw, "%a %b %d %H:%M:%S +0000 %Y").replace(tzinfo=timezone.utc)
+            created_at = datetime.fromisoformat(
+                tweet.get("created_at", "").replace("Z", "+00:00")
+            )
         except Exception:
             created_at = datetime.now(timezone.utc)
 
-        # Extract URLs from tweet
-        entities = tweet.get("entities") or {}
-        urls_expanded = [u.get("expanded_url", "") for u in entities.get("urls", [])]
-
         author = await self.upsert_user(
             platform_name="twitter",
-            platform_user_id=user.get("id_str") or f"tw_{username}",
+            platform_user_id=tweet.get("author_id", f"tw_{username}"),
             username=username,
             profile_url=f"https://x.com/{username}",
         )
@@ -198,7 +171,7 @@ class TwitterScraper(BaseScraper):
             platform_post_id=f"twitter_{tid}",
             body=text,
             title=text[:120],
-            url=url,
+            url=f"https://x.com/{username}/status/{tid}",
             posted_at=created_at,
             score=likes + retweets * 3,
             raw_metadata={
@@ -211,6 +184,140 @@ class TwitterScraper(BaseScraper):
                 "retweets": retweets,
                 "replies": replies,
                 "query": query,
-                "urls": urls_expanded,
+                "via": "api_v2",
+            },
+        )
+
+    # ── Nitter fallback ──────────────────────────────────────────────────────
+
+    async def _find_nitter(self, client: httpx.AsyncClient) -> str:
+        """Return the first reachable Nitter instance."""
+        for base in NITTER_INSTANCES:
+            try:
+                resp = await client.get(f"{base}/search?q=test&f=tweets", timeout=10.0)
+                if resp.status_code == 200 and "tweet" in resp.text.lower():
+                    self.log.info("nitter_instance_found", base=base)
+                    return base
+            except Exception:
+                continue
+        return ""
+
+    async def _scrape_nitter(self, client: httpx.AsyncClient, seen_ids: set[str]):
+        for query in SEARCH_QUERIES:
+            await self.rate_limit()
+            try:
+                url = f"{self._nitter_base}/search?q={quote(query)}&f=tweets"
+                resp = await client.get(url, headers=random_headers(), timeout=20.0)
+                if resp.status_code != 200:
+                    self.log.warning("nitter_fetch_failed", query=query, status=resp.status_code)
+                    continue
+
+                tweets = self._parse_nitter_html(resp.text)
+                for tw in tweets:
+                    tid = tw.get("id", "")
+                    if not tid or tid in seen_ids:
+                        continue
+                    seen_ids.add(tid)
+                    await self._store_tweet_nitter(tw, query)
+
+            except Exception as e:
+                self.log.warning("nitter_scrape_error", query=query, error=str(e))
+
+    def _parse_nitter_html(self, html: str) -> list[dict]:
+        """Parse tweet cards from Nitter HTML."""
+        tweets = []
+
+        # Nitter renders: <div class="timeline-item">...</div>
+        # Each contains:
+        #   <a class="tweet-link" href="/@user/status/ID">
+        #   <div class="tweet-content">text</div>
+        #   <a class="username">@user</a>
+        #   <span class="tweet-date"><a title="date">...</a></span>
+
+        for block in re.finditer(
+            r'<div class="timeline-item[^"]*">(.*?)</div>\s*</div>\s*</div>',
+            html, re.S
+        ):
+            blk = block.group(1)
+
+            # Tweet ID from status link
+            tid_m = re.search(r'/status/(\d+)', blk)
+            tid = tid_m.group(1) if tid_m else ""
+
+            # Username
+            user_m = re.search(r'<a class="username"[^>]*>@?([^<]+)</a>', blk)
+            username = user_m.group(1).strip() if user_m else "unknown"
+
+            # Tweet text
+            text_m = re.search(
+                r'<div class="tweet-content[^"]*"[^>]*>(.*?)</div>',
+                blk, re.S
+            )
+            if not text_m:
+                continue
+            text = re.sub(r'<[^>]+>', ' ', text_m.group(1))
+            text = re.sub(r'\s+', ' ', text).strip()
+            if not text or len(text) < 15:
+                continue
+
+            # Date
+            date_m = re.search(r'<span[^>]+title="([^"]+)"', blk)
+            try:
+                # Nitter date format: "Jan 1, 2024 · 12:00 PM UTC"
+                date_str = (date_m.group(1) if date_m else "").replace(" · ", " ")
+                created_at = datetime.strptime(date_str[:20], "%b %d, %Y %I:%M %p")
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            except Exception:
+                created_at = datetime.now(timezone.utc)
+
+            # Stats (likes, retweets)
+            likes_m    = re.search(r'class="icon-heart[^>]*>.*?<span[^>]*>(\d+)', blk, re.S)
+            rt_m       = re.search(r'class="icon-retweet[^>]*>.*?<span[^>]*>(\d+)', blk, re.S)
+            likes    = int(likes_m.group(1)) if likes_m else 0
+            retweets = int(rt_m.group(1)) if rt_m else 0
+
+            tweets.append(dict(
+                id=tid,
+                username=username,
+                text=text,
+                created_at=created_at,
+                likes=likes,
+                retweets=retweets,
+            ))
+
+        return tweets
+
+    async def _store_tweet_nitter(self, tw: dict, query: str):
+        username = tw.get("username", "unknown")
+        tid      = tw.get("id", "")
+        text     = tw.get("text", "")
+        likes    = tw.get("likes", 0)
+        retweets = tw.get("retweets", 0)
+
+        author = await self.upsert_user(
+            platform_name="twitter",
+            platform_user_id=f"tw_{username}",
+            username=username,
+            profile_url=f"https://x.com/{username}",
+        )
+
+        await self.upsert_post(
+            user_id=author,
+            platform_name="twitter",
+            post_type="post",
+            platform_post_id=f"twitter_{tid}",
+            body=text,
+            title=text[:120],
+            url=f"https://x.com/{username}/status/{tid}" if tid else "",
+            posted_at=tw.get("created_at", datetime.now(timezone.utc)),
+            score=likes + retweets * 3,
+            raw_metadata={
+                "source": "twitter",
+                "tweet_id": tid,
+                "username": username,
+                "likes": likes,
+                "retweets": retweets,
+                "query": query,
+                "via": "nitter",
             },
         )
