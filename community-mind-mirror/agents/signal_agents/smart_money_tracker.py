@@ -10,7 +10,7 @@ from agno.agent import Agent
 from agno.models.azure import AzureOpenAI
 
 from agents.config import (
-    DATABASE_URL, AGENT_MODELS,
+    DATABASE_URL, DATABASE_SSL, AGENT_MODELS,
     AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_VERSION,
     get_deployment_for_model,
 )
@@ -53,7 +53,7 @@ CRITICAL: Return ONLY a valid JSON array with ALL sectors. No markdown, no expla
 
 async def _prefetch_smart_money_data() -> str:
     """Pre-compute YC vs VC vs builder activity per sector."""
-    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3)
+    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3, ssl=DATABASE_SSL)
     try:
         # Get YC batch composition
         batches = await pool.fetch(

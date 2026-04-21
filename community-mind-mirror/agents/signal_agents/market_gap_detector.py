@@ -10,7 +10,7 @@ from agno.agent import Agent
 from agno.models.azure import AzureOpenAI
 
 from agents.config import (
-    DATABASE_URL, AGENT_MODELS,
+    DATABASE_URL, DATABASE_SSL, AGENT_MODELS,
     AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_VERSION,
     get_deployment_for_model,
 )
@@ -50,7 +50,7 @@ Generate at least 5 gap entries from the data provided."""
 
 async def _prefetch_gap_data() -> str:
     """Pre-compute all market gap data."""
-    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3)
+    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3, ssl=DATABASE_SSL)
     try:
         # Source 1: Existing pain points
         pain_points = await pool.fetch(

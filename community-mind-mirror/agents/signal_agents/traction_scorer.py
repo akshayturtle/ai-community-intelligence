@@ -10,7 +10,7 @@ from agno.agent import Agent
 from agno.models.azure import AzureOpenAI
 
 from agents.config import (
-    DATABASE_URL, AGENT_MODELS,
+    DATABASE_URL, DATABASE_SSL, AGENT_MODELS,
     AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_VERSION,
     get_deployment_for_model,
 )
@@ -55,7 +55,7 @@ CRITICAL: Return ONLY a valid JSON array — no markdown, no explanation."""
 
 async def _prefetch_product_data() -> str:
     """Pre-fetch all product data from DB, return as formatted context string."""
-    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3)
+    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3, ssl=DATABASE_SSL)
     try:
         # Get active products — use low threshold so all tracked products get scored
         # (products with little data will simply score low, which is useful signal)

@@ -8,16 +8,19 @@ from database.connection import Base, engine, async_session, Platform
 
 
 SEED_PLATFORMS = [
-    "reddit",
-    "hackernews",
-    "youtube",
-    "twitter",
-    "linkedin",
-    "producthunt",
-    "stackoverflow",
-    "discord",
-    "mastodon",
-    "bluesky",
+    # Social / community
+    "reddit", "hackernews", "youtube", "twitter", "linkedin",
+    "producthunt", "stackoverflow", "discord", "mastodon", "bluesky",
+    # Job boards
+    "jobs", "remoteok", "himalayas", "remotive", "themuse",
+    "arbeitnow", "greenhouse", "lever", "ashby", "hn_hiring",
+    "usajobs", "web3career", "adzuna",
+    # Freelance platforms
+    "freelancer", "peopleperhour", "upwork", "fiverr",
+    # Research / tech
+    "arxiv", "github", "huggingface", "paperswithcode", "packages", "yc",
+    # News
+    "news",
 ]
 
 

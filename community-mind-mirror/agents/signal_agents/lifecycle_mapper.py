@@ -10,7 +10,7 @@ from agno.agent import Agent
 from agno.models.azure import AzureOpenAI
 
 from agents.config import (
-    DATABASE_URL, AGENT_MODELS,
+    DATABASE_URL, DATABASE_SSL, AGENT_MODELS,
     AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_VERSION,
     get_deployment_for_model,
 )
@@ -74,7 +74,7 @@ No markdown, no explanation. Score ALL technologies provided — do not skip any
 
 async def _prefetch_lifecycle_data() -> str:
     """Pre-compute evidence for all technologies from multiple sources."""
-    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3)
+    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3, ssl=DATABASE_SSL)
     try:
         # Get technologies from topics + discovered products
         topics = await pool.fetch(

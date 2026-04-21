@@ -195,14 +195,15 @@ class CrossSourceOrchestrator:
 
     async def run_single(self, agent_name: str) -> str:
         """Run a single agent by name."""
-        if agent_name not in AGENT_CREATORS:
-            raise ValueError(
-                f"Unknown agent: {agent_name}. Available: {list(AGENT_CREATORS.keys())}"
-            )
-
-        # Use pre-fetch path for redesigned agents
+        # Pre-fetch agents (pure-Python data gathering + one LLM call)
         if agent_name in PREFETCH_AGENTS:
             return await self._run_prefetch_agent(agent_name)
+
+        if agent_name not in AGENT_CREATORS:
+            raise ValueError(
+                f"Unknown agent: {agent_name}. Available: "
+                f"{sorted(set(list(AGENT_CREATORS.keys()) + list(PREFETCH_AGENTS.keys())))}"
+            )
 
         agent = AGENT_CREATORS[agent_name]()
         today = datetime.now().strftime("%Y-%m-%d")

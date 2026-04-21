@@ -13,6 +13,15 @@ _raw_url = os.getenv(
 )
 DATABASE_URL = _raw_url.replace("postgresql+asyncpg://", "postgresql://")
 
+# asyncpg cannot handle ssl= in the URL string — it must be a connection kwarg.
+# Strip it from the URL and export separately so agents can pass ssl=DATABASE_SSL.
+import re as _re
+_ssl_match = _re.search(r'[?&]ssl=([^&]+)', DATABASE_URL)
+DATABASE_SSL: str | None = _ssl_match.group(1) if _ssl_match else None  # e.g. 'require'
+DATABASE_URL = _re.sub(r'([?&])ssl=[^&]+', lambda m: m.group(1) if '?' in DATABASE_URL[:DATABASE_URL.index(m.group(0))] else '', DATABASE_URL).rstrip('?&')
+# Simpler: just always strip ?ssl=... or &ssl=...
+DATABASE_URL = _re.sub(r'[?&]ssl=[^&]*', '', DATABASE_URL).rstrip('?&')
+
 # Azure OpenAI config
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "")
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "")

@@ -10,7 +10,7 @@ from agno.agent import Agent
 from agno.models.azure import AzureOpenAI
 
 from agents.config import (
-    DATABASE_URL, AGENT_MODELS,
+    DATABASE_URL, DATABASE_SSL, AGENT_MODELS,
     AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_VERSION,
     get_deployment_for_model,
 )
@@ -67,7 +67,7 @@ SKILL_KEYWORDS = [
 
 async def _prefetch_talent_data() -> str:
     """Pre-compute supply-demand signals for each skill area."""
-    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3)
+    pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3, ssl=DATABASE_SSL)
     try:
         skill_data = []
 
@@ -153,8 +153,36 @@ async def _prefetch_talent_data() -> str:
                 ) or 0
                 community = max(community, c)
 
+            # Freelance platform demand (upwork/fiverr/freelancer gig posts)
+            freelance_demand = 0
+            freelance_avg_budget = None
+            for kw in keywords[:3]:
+                fd = await pool.fetchval(
+                    "SELECT COUNT(*) FROM gig_posts g "
+                    "JOIN posts p ON p.id = g.post_id "
+                    "WHERE g.is_gig = true "
+                    "AND p.raw_metadata->>'source' = ANY(ARRAY['upwork','fiverr','freelancer','peopleperhour','adzuna','web3career']) "
+                    "AND EXISTS (SELECT 1 FROM unnest(g.skills_required) s WHERE LOWER(s) LIKE $1) "
+                    "AND g.posted_at > NOW() - INTERVAL '30 days'",
+                    f"%{kw}%"
+                ) or 0
+                if fd > freelance_demand:
+                    freelance_demand = int(fd)
+                    # Get avg budget for this skill
+                    avg_b = await pool.fetchval(
+                        "SELECT AVG((g.budget_min_usd + g.budget_max_usd) / 2.0) "
+                        "FROM gig_posts g JOIN posts p ON p.id = g.post_id "
+                        "WHERE g.is_gig = true "
+                        "AND g.budget_min_usd IS NOT NULL AND g.budget_max_usd IS NOT NULL "
+                        "AND p.raw_metadata->>'source' = ANY(ARRAY['upwork','fiverr','freelancer','peopleperhour']) "
+                        "AND EXISTS (SELECT 1 FROM unnest(g.skills_required) s WHERE LOWER(s) LIKE $1)",
+                        f"%{kw}%"
+                    )
+                    if avg_b:
+                        freelance_avg_budget = round(float(avg_b))
+
             # Only include skills with some signal
-            if jobs + so + gh + community == 0:
+            if jobs + so + gh + community + freelance_demand == 0:
                 continue
 
             skill_data.append({
@@ -168,6 +196,8 @@ async def _prefetch_talent_data() -> str:
                     "github_repos": gh,
                     "yc_companies_recent": yc,
                     "community_posts_30d": community,
+                    "freelance_gigs_30d": freelance_demand,
+                    "freelance_avg_budget_usd": freelance_avg_budget,
                 },
             })
 
