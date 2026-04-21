@@ -19,6 +19,7 @@ from agents.signal_agents.smart_money_tracker import create_smart_money_agent, r
 from agents.signal_agents.talent_flow import create_talent_flow_agent, run_talent_flow
 from agents.signal_agents.product_discoverer import create_product_discoverer_agent
 from agents.signal_agents.narrative_shift import create_narrative_shift_agent, run_narrative_shift
+from agents.signal_agents.freelance_market import run as run_freelance_market
 from agents.synthesizer.insight_synthesizer import create_insight_synthesizer_agent
 from agents.config import DATABASE_URL
 
@@ -34,6 +35,7 @@ PREFETCH_AGENTS = {
     "smart_money_tracker": run_smart_money_tracker,
     "talent_flow": run_talent_flow,
     "narrative_shift": run_narrative_shift,
+    "freelance_market": run_freelance_market,
 }
 
 logger = structlog.get_logger()

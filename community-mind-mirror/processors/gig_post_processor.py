@@ -60,6 +60,12 @@ async def run(batch_size: int = BATCH_SIZE, concurrency: int = CONCURRENCY) -> t
         ))
         await session.commit()
 
+    # Dedicated job/freelance platforms — always gig posts, no classification needed
+    DEDICATED_PLATFORMS = [
+        "upwork", "fiverr", "freelancer", "peopleperhour",
+        "adzuna", "web3career", "twitter",
+    ]
+
     # Process in batches until no more candidates
     while True:
         batch_num += 1
@@ -67,7 +73,8 @@ async def run(batch_size: int = BATCH_SIZE, concurrency: int = CONCURRENCY) -> t
             result = await session.execute(
                 text("""
                     SELECT p.id, p.title, p.body, p.url, p.subreddit, p.posted_at,
-                           u.username
+                           u.username,
+                           p.raw_metadata->>'source' AS source_platform
                     FROM posts p
                     LEFT JOIN users u ON u.id = p.user_id
                     LEFT JOIN gig_posts gp ON gp.post_id = p.id
@@ -77,8 +84,10 @@ async def run(batch_size: int = BATCH_SIZE, concurrency: int = CONCURRENCY) -> t
                       AND (
                           p.raw_metadata->>'source' = 'gig_search'
                           OR LOWER(p.subreddit) = ANY(:subreddits)
+                          OR p.raw_metadata->>'source' = ANY(:platforms)
                       )
                     ORDER BY
+                        CASE WHEN p.raw_metadata->>'source' = ANY(:platforms) THEN 0 ELSE 1 END,
                         CASE WHEN LOWER(p.subreddit) = ANY(:tier1) THEN 0 ELSE 1 END,
                         p.posted_at DESC NULLS LAST
                     LIMIT :batch_size
@@ -86,6 +95,7 @@ async def run(batch_size: int = BATCH_SIZE, concurrency: int = CONCURRENCY) -> t
                 {
                     "subreddits": list(ALL_GIG_SUBS),
                     "tier1": list(TIER_1_SUBS),
+                    "platforms": DEDICATED_PLATFORMS,
                     "batch_size": batch_size,
                 },
             )
@@ -106,8 +116,11 @@ async def run(batch_size: int = BATCH_SIZE, concurrency: int = CONCURRENCY) -> t
             nonlocal batch_gigs, batch_rejected, batch_failed
             async with sem:
                 try:
-                    result = await _extract_gig(row, usage)
-                    if result and result.get("is_gig"):
+                    src = getattr(row, "source_platform", None) or ""
+                    is_dedicated = src in DEDICATED_PLATFORMS
+                    result = await _extract_gig(row, usage, is_dedicated=is_dedicated)
+                    # Dedicated platforms are always gigs — only reject if extraction failed
+                    if result and (result.get("is_gig") or is_dedicated):
                         await _store_gig(row, result, is_gig=True)
                         batch_gigs += 1
                     else:
@@ -143,16 +156,30 @@ async def run(batch_size: int = BATCH_SIZE, concurrency: int = CONCURRENCY) -> t
     return total_gigs, total_failed
 
 
-async def _extract_gig(row, usage: TokenUsage) -> dict | None:
+async def _extract_gig(row, usage: TokenUsage, is_dedicated: bool = False) -> dict | None:
     """Use LLM to classify and extract structured gig data from a post."""
     title = row.title or "N/A"
     body = (row.body or "")[:1500]
+    source = getattr(row, "source_platform", None) or ""
     text_content = f"Title: {title}\nBody: {body}"
     if row.subreddit:
         text_content += f"\nSubreddit: r/{row.subreddit}"
+    if source:
+        text_content += f"\nSource platform: {source}"
 
-    prompt = f"""Analyze this Reddit post and determine if it's a hiring, freelance, gig, job, or co-founder search post.
-If it IS any kind of hiring/work opportunity post, extract structured data. If NOT (e.g. it's a discussion, question, news, meme), return {{"is_gig": false}}.
+    if is_dedicated:
+        # These are definitively job/gig posts — skip classification, just extract
+        classification_instruction = (
+            f"This post is from {source}, a dedicated freelance/job platform. "
+            f"It is definitely a gig/job post. Set is_gig=true and extract all structured fields."
+        )
+    else:
+        classification_instruction = (
+            "Analyze this post and determine if it's a hiring, freelance, gig, job, or co-founder search post. "
+            "If NOT (e.g. it's a discussion, question, news, meme), return {\"is_gig\": false}."
+        )
+
+    prompt = f"""{classification_instruction}
 
 {text_content}
 

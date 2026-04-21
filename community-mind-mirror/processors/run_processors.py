@@ -125,6 +125,12 @@ async def run_gig_posts() -> dict:
     return {"processed": processed, "failed": failed}
 
 
+async def run_freelance_market() -> dict:
+    from processors.freelance_market_processor import FreelanceMarketProcessor
+    processor = FreelanceMarketProcessor()
+    return await processor.run()
+
+
 PROCESSOR_MAP = {
     "sentiment": run_sentiment,
     "personas": run_personas,
@@ -140,6 +146,7 @@ PROCESSOR_MAP = {
     "platform_tones": run_platform_tones,
     "product_reviews": run_product_reviews,
     "gig_posts": run_gig_posts,
+    "freelance_market": run_freelance_market,
 }
 
 

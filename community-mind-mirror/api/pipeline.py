@@ -27,13 +27,13 @@ PROCESSORS = [
     "sentiment", "topics", "news", "products", "personas",
     "migrations", "pain_points", "hype_index",
     "leader_shifts", "funding", "platform_tones", "graph",
-    "product_reviews", "gig_posts",
+    "product_reviews", "gig_posts", "freelance_market",
 ]
 AGENTS = [
     "research_pipeline", "traction_scorer", "market_gap_detector",
     "competitive_threat", "divergence_detector", "lifecycle_mapper",
     "smart_money_tracker", "talent_flow", "product_discoverer",
-    "narrative_shift", "insight_synthesizer",
+    "narrative_shift", "insight_synthesizer", "freelance_market",
 ]
 
 ALL_STEPS: dict[str, str] = (
