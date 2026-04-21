@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard, TrendingUp, Users, Newspaper,
   Globe, Search, ChevronLeft, ChevronRight, Brain, Lightbulb,
-  Radar, Settings, Briefcase, FlaskConical,
+  Radar, Settings, Briefcase, FlaskConical, Zap,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -15,6 +15,7 @@ const links = [
   { to: "/research", icon: FlaskConical, label: "Research" },
   { to: "/signals", icon: Radar, label: "Signals" },
   { to: "/news", icon: Newspaper, label: "News & Research" },
+  { to: "/scrapers", icon: Zap, label: "Scrapers" },
   { to: "/system", icon: Settings, label: "System" },
   { to: "/geo", icon: Globe, label: "Geo" },
   { to: "/search", icon: Search, label: "Search" },

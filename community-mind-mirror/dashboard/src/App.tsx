@@ -15,6 +15,7 @@ import System from "./pages/System";
 import GigBoard from "./pages/GigBoard";
 import Research from "./pages/Research";
 import ResearchDetail from "./pages/ResearchDetail";
+import Scrapers from "./pages/Scrapers";
 import { useWebSocket } from "./hooks/useWebSocket";
 
 const queryClient = new QueryClient({
@@ -45,6 +46,7 @@ function AppInner() {
           <Route path="research/:id" element={<ResearchDetail />} />
           <Route path="signals" element={<Signals />} />
           <Route path="news" element={<News />} />
+          <Route path="scrapers" element={<Scrapers />} />
           <Route path="system" element={<System />} />
           <Route path="geo" element={<Geo />} />
           <Route path="search" element={<SearchPage />} />

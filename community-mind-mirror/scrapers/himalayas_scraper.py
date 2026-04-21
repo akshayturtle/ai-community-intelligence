@@ -12,6 +12,21 @@ from scrapers.base_scraper import BaseScraper
 
 logger = structlog.get_logger()
 
+TECH_KEYWORDS = {
+    "engineer", "developer", "software", "data", "machine learning", "ml", "ai",
+    "backend", "frontend", "fullstack", "full-stack", "devops", "cloud", "platform",
+    "infrastructure", "sre", "python", "javascript", "typescript", "rust", "golang",
+    "java", "scala", "react", "node", "api", "database", "analytics", "scientist",
+    "architect", "security", "blockchain", "web3", "crypto", "solidity",
+    "product manager", "ux", "ui", "design", "research", "nlp", "llm", "gpu",
+    "kubernetes", "docker", "aws", "gcp", "azure", "mobile", "ios", "android",
+}
+
+
+def _is_tech(title: str, categories: list) -> bool:
+    text = title.lower() + " " + " ".join(str(c).lower() for c in (categories or []))
+    return any(kw in text for kw in TECH_KEYWORDS)
+
 
 class HimalayasScraper(BaseScraper):
     """Scrapes remote job listings from Himalayas' public API."""
@@ -90,6 +105,10 @@ class HimalayasScraper(BaseScraper):
 
                     categories = job.get("categories", []) or []
                     tags = categories if isinstance(categories, list) else []
+
+                    # Skip non-tech jobs
+                    if not _is_tech(title_raw, tags):
+                        continue
 
                     description = job.get("description", "")
                     if description:

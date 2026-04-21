@@ -149,6 +149,12 @@ SCRAPER_ORDER = [
     # Job scrapers
     "jobs", "remoteok", "himalayas", "remotive", "themuse",
     "arbeitnow", "greenhouse", "lever", "ashby", "hn_hiring", "usajobs",
+    # New job scrapers
+    "web3career", "adzuna",
+    # Freelance project scrapers
+    "freelancer", "peopleperhour",
+    # Proxy-based scrapers (require DataImpulse credentials)
+    "upwork", "fiverr", "twitter",
 ]
 
 
@@ -163,8 +169,8 @@ def get_scraper(name: str):
         from scrapers.news_scraper import NewsScraper
         return NewsScraper()
     elif name == "arxiv":
-        from scrapers.arxiv_scraper import ArxivScraper
-        return ArxivScraper()
+        from scrapers.arxiv_scraper import ArXivScraper
+        return ArXivScraper()
     elif name == "github":
         from scrapers.github_scraper import GitHubScraper
         return GitHubScraper()
@@ -225,45 +231,79 @@ def get_scraper(name: str):
     elif name == "product_reddit":
         from scrapers.product_reddit_scraper import ProductRedditScraper
         return ProductRedditScraper()
+    elif name == "web3career":
+        from scrapers.web3career_scraper import Web3CareerScraper
+        return Web3CareerScraper()
+    elif name == "adzuna":
+        from scrapers.adzuna_scraper import AdzunaScraper
+        return AdzunaScraper()
+    elif name == "freelancer":
+        from scrapers.freelancer_scraper import FreelancerScraper
+        return FreelancerScraper()
+    elif name == "peopleperhour":
+        from scrapers.peopleperhour_scraper import PeoplePerHourScraper
+        return PeoplePerHourScraper()
+    elif name == "upwork":
+        from scrapers.upwork_scraper import UpworkScraper
+        return UpworkScraper()
+    elif name == "fiverr":
+        from scrapers.fiverr_scraper import FiverrScraper
+        return FiverrScraper()
+    elif name == "twitter":
+        from scrapers.twitter_scraper import TwitterScraper
+        return TwitterScraper()
     else:
         raise ValueError(f"Unknown scraper: {name}")
 
 
-# ── Phase 1: Scrapers ──────────────────────────────────────────────
+# ── Phase 1: Scrapers (parallel) ───────────────────────────────────
+SCRAPER_CONCURRENCY = int(os.getenv("SCRAPER_CONCURRENCY", "8"))
+
+
 async def run_scrapers(scraper_names: list[str] | None = None) -> dict:
+    """Run scrapers in parallel, up to SCRAPER_CONCURRENCY at a time."""
     names = scraper_names or SCRAPER_ORDER
-    results = {}
+    results: dict = {}
+    sem = asyncio.Semaphore(SCRAPER_CONCURRENCY)
 
-    for name in names:
-        print(f"\n{'='*50}\n  Scraper: {name}\n{'='*50}")
-        t0 = time.time()
-        try:
-            scraper = get_scraper(name)
-            await asyncio.wait_for(scraper.run(), timeout=SCRAPER_TIMEOUT)
-            results[name] = {
-                "status": "ok",
-                "fetched": scraper.records_fetched,
-                "new": scraper.records_new,
-                "duration_s": round(time.time() - t0, 1),
-            }
-            print(f"  {name}: OK — {scraper.records_fetched} fetched, {scraper.records_new} new")
-        except asyncio.TimeoutError:
-            elapsed = round(time.time() - t0, 1)
-            results[name] = {
-                "status": "timeout", "fetched": getattr(scraper, "records_fetched", 0),
-                "new": getattr(scraper, "records_new", 0),
-                "error": f"Timed out after {SCRAPER_TIMEOUT}s",
-                "duration_s": elapsed,
-            }
-            print(f"  {name}: TIMEOUT after {elapsed}s — skipping")
-        except Exception as e:
-            results[name] = {
-                "status": "error", "fetched": 0, "new": 0,
-                "error": str(e), "duration_s": round(time.time() - t0, 1),
-            }
-            print(f"  {name}: ERROR — {e}")
-            traceback.print_exc()
+    async def _run_one(name: str):
+        async with sem:
+            print(f"  Scraper: {name}")
+            t0 = time.time()
+            scraper = None
+            try:
+                scraper = get_scraper(name)
+                await asyncio.wait_for(scraper.run(), timeout=SCRAPER_TIMEOUT)
+                results[name] = {
+                    "status": "ok",
+                    "fetched": scraper.records_fetched,
+                    "new": scraper.records_new,
+                    "duration_s": round(time.time() - t0, 1),
+                }
+                print(f"  {name}: OK — {scraper.records_fetched} fetched, {scraper.records_new} new")
+            except asyncio.TimeoutError:
+                elapsed = round(time.time() - t0, 1)
+                results[name] = {
+                    "status": "timeout",
+                    "fetched": getattr(scraper, "records_fetched", 0) if scraper else 0,
+                    "new": getattr(scraper, "records_new", 0) if scraper else 0,
+                    "error": f"Timed out after {SCRAPER_TIMEOUT}s",
+                    "duration_s": elapsed,
+                }
+                print(f"  {name}: TIMEOUT after {elapsed}s — skipping")
+            except Exception as e:
+                results[name] = {
+                    "status": "error", "fetched": 0, "new": 0,
+                    "error": str(e), "duration_s": round(time.time() - t0, 1),
+                }
+                print(f"  {name}: ERROR — {e}")
+                traceback.print_exc()
 
+    print(f"\n  Running {len(names)} scrapers (concurrency={SCRAPER_CONCURRENCY})…")
+    await asyncio.gather(*[_run_one(n) for n in names])
+    ok  = sum(1 for r in results.values() if r["status"] == "ok")
+    err = sum(1 for r in results.values() if r["status"] != "ok")
+    print(f"  Scrapers done: {ok} ok, {err} errors/timeouts")
     return results
 
 

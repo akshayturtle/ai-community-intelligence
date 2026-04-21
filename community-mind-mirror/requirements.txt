@@ -48,3 +48,5 @@ vaderSentiment>=3.3.2
 # Graph analysis
 networkx>=3.2
 python-louvain>=0.16
+gunicorn
+agno>=2.5.17

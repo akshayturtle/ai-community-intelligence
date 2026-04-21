@@ -1,17 +1,25 @@
 """FastAPI application for the Community Mind Mirror Intelligence Dashboard."""
 
+import asyncio
+import os
 import time
+from contextlib import asynccontextmanager
 
 import structlog
 import uvicorn
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select, func
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from sqlalchemy import select, func, text
 
 from api.deps import get_db
+from api.pipeline import run_pipeline, get_state as get_pipeline_state, is_running, set_broadcast
 from api.routes import dashboard, topics, personas, news, search, websocket, intelligence, signals, agents, source_data, job_intelligence, product_reviews, gig_board, research
 from database.connection import (
-    async_session, User, Post, Persona, Topic, TopicMention,
+    async_session, engine, Base, User, Post, Persona, Topic, TopicMention,
     CommunityGraph, NewsEvent, ScraperRun,
     DiscoveredProduct, ProductMention, Migration, PainPoint,
     HypeIndex, LeaderShift, PlatformTone, FundingRound, AgentRun,
@@ -23,8 +31,55 @@ from database.connection import (
 
 logger = structlog.get_logger()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize database tables and start 24-hour scraper scheduler."""
+    # ── DB init ──────────────────────────────────────────────────────────────
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            result = await conn.execute(text("SELECT COUNT(*) FROM platforms"))
+            count = result.scalar()
+            if count == 0:
+                await conn.execute(text("""
+                    INSERT INTO platforms (name) VALUES
+                    ('reddit'), ('hackernews'), ('github'), ('arxiv'),
+                    ('producthunt'), ('stackoverflow'), ('youtube'),
+                    ('news'), ('twitter'), ('linkedin')
+                    ON CONFLICT (name) DO NOTHING
+                """))
+        logger.info("database_initialized")
+    except Exception as e:
+        logger.error("database_init_failed", error=str(e))
+
+    # ── Wire broadcast so pipeline can push WebSocket events ─────────────────
+    from api.routes.websocket import broadcast
+    set_broadcast(broadcast)
+
+    # ── Scheduler ────────────────────────────────────────────────────────────
+    interval_hours = int(os.getenv("PIPELINE_INTERVAL_HOURS", "24"))
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        run_pipeline,
+        trigger=IntervalTrigger(hours=interval_hours),
+        id="pipeline",
+        name="Scraper pipeline",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+    scheduler.start()
+    logger.info("scheduler_started", interval_hours=interval_hours)
+
+    yield
+
+    scheduler.shutdown(wait=False)
+    logger.info("scheduler_stopped")
+
+
 app = FastAPI(
     title="Community Mind Mirror",
+    lifespan=lifespan,
     description="Intelligence Dashboard API for AI/tech community analysis",
     version="1.0.0",
 )
@@ -76,6 +131,54 @@ app.include_router(research.router, prefix="/api/research", tags=["research"])
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "service": "community-mind-mirror"}
+
+
+@app.post("/api/pipeline/trigger")
+async def trigger_pipeline():
+    """Manually trigger the scraper pipeline (no-op if already running)."""
+    if is_running():
+        return {"status": "already_running", "message": "Pipeline is already in progress."}
+    asyncio.create_task(run_pipeline())
+    return {"status": "started", "message": "Pipeline triggered. Check logs for progress."}
+
+
+@app.get("/api/pipeline/status")
+async def pipeline_status():
+    """Return whether the pipeline is currently running."""
+    return {"running": is_running()}
+
+
+@app.get("/api/pipeline/state")
+async def pipeline_state_endpoint():
+    """Full pipeline state: step progress, log tail, phase."""
+    return get_pipeline_state()
+
+
+@app.get("/api/debug-db")
+async def debug_db():
+    """Debug endpoint to test DB connectivity."""
+    import traceback
+    from config.settings import DATABASE_URL
+    import socket
+    # Show masked URL and DNS resolution
+    masked_url = DATABASE_URL.replace(DATABASE_URL.split("@")[0].split("://")[1], "****") if "@" in DATABASE_URL else DATABASE_URL
+    host = DATABASE_URL.split("@")[-1].split("/")[0].split(":")[0] if "@" in DATABASE_URL else "unknown"
+    try:
+        ip = socket.gethostbyname(host)
+        dns_ok = True
+    except Exception as dns_err:
+        ip = str(dns_err)
+        dns_ok = False
+
+    try:
+        async with async_session() as session:
+            result = await session.execute(text("SELECT COUNT(*) FROM platforms"))
+            count = result.scalar()
+            result2 = await session.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name"))
+            tables = [r[0] for r in result2.fetchall()]
+        return {"status": "ok", "platforms": count, "tables": tables, "host": host, "dns": ip}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "host": host, "dns_ok": dns_ok, "dns_ip": ip, "db_url_masked": masked_url}
 
 
 @app.get("/api/stats")
@@ -157,6 +260,21 @@ async def stats():
         "gig_posts": gig_posts_count,
         "research_projects": research_projects_count,
     }
+
+
+# Serve React frontend from /static if it exists
+_static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+if os.path.isdir(_static_dir):
+    app.mount("/assets", StaticFiles(directory=os.path.join(_static_dir, "assets")), name="assets")
+
+    @app.get("/favicon.svg")
+    async def favicon():
+        return FileResponse(os.path.join(_static_dir, "favicon.svg"))
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Serve React SPA — catch-all for frontend routes."""
+        return FileResponse(os.path.join(_static_dir, "index.html"))
 
 
 if __name__ == "__main__":

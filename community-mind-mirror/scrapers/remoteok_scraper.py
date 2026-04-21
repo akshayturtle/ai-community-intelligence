@@ -11,6 +11,22 @@ from scrapers.base_scraper import BaseScraper
 
 logger = structlog.get_logger()
 
+# Only keep jobs that contain at least one of these keywords in title or tags
+TECH_KEYWORDS = {
+    "engineer", "developer", "software", "data", "machine learning", "ml", "ai",
+    "backend", "frontend", "fullstack", "full-stack", "devops", "cloud", "platform",
+    "infrastructure", "sre", "python", "javascript", "typescript", "rust", "golang",
+    "java", "scala", "react", "node", "api", "database", "analytics", "scientist",
+    "architect", "security", "blockchain", "web3", "crypto", "solidity",
+    "product manager", "ux", "ui", "design", "research", "nlp", "llm", "gpu",
+    "kubernetes", "docker", "aws", "gcp", "azure", "mobile", "ios", "android",
+}
+
+
+def _is_tech(title: str, tags: list) -> bool:
+    text = title.lower() + " " + " ".join(t.lower() for t in (tags or []))
+    return any(kw in text for kw in TECH_KEYWORDS)
+
 
 class RemoteOKScraper(BaseScraper):
     """Scrapes remote job listings from RemoteOK's public API."""
@@ -83,6 +99,11 @@ class RemoteOKScraper(BaseScraper):
                 pass
 
             tags = job.get("tags", []) or []
+
+            # Skip non-tech jobs
+            if not _is_tech(position, tags):
+                continue
+
             description = job.get("description", "")
 
             # Strip simple HTML tags from description

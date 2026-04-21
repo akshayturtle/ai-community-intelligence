@@ -12,6 +12,21 @@ from scrapers.base_scraper import BaseScraper
 
 logger = structlog.get_logger()
 
+TECH_KEYWORDS = {
+    "engineer", "developer", "software", "data", "machine learning", "ml", "ai",
+    "backend", "frontend", "fullstack", "full-stack", "devops", "cloud", "platform",
+    "infrastructure", "sre", "python", "javascript", "typescript", "rust", "golang",
+    "java", "scala", "react", "node", "api", "database", "analytics", "scientist",
+    "architect", "security", "blockchain", "web3", "crypto", "solidity",
+    "product manager", "ux", "ui", "design", "research", "nlp", "llm", "gpu",
+    "kubernetes", "docker", "aws", "gcp", "azure", "mobile", "ios", "android",
+}
+
+
+def _is_tech(title: str, tags: list) -> bool:
+    text = title.lower() + " " + " ".join(str(t).lower() for t in (tags or []))
+    return any(kw in text for kw in TECH_KEYWORDS)
+
 
 class ArbeitnowScraper(BaseScraper):
     """Scrapes job listings from Arbeitnow's public API."""
@@ -76,6 +91,11 @@ class ArbeitnowScraper(BaseScraper):
 
                     is_remote = bool(job.get("remote", False))
                     tags = job.get("tags", []) or []
+
+                    # Skip non-tech jobs
+                    if not _is_tech(title_raw, tags):
+                        continue
+
                     job_types = job.get("job_types", []) or []
                     job_type = job_types[0].replace(" ", "_").lower() if job_types else ""
                     location = job.get("location", "")

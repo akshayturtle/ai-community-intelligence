@@ -55,16 +55,16 @@ REDDIT_SUBREDDITS = [
 ]
 
 REDDIT_SCRAPE_CONFIG = {
-    "posts_per_subreddit": 500,
-    "sort_modes": ["top", "hot", "new"],
+    "posts_per_subreddit": 100,       # was 500 — each run gets fresh top-100, dedup handles the rest
+    "sort_modes": ["hot", "new"],     # was ["top","hot","new"] — 3→2 saves 33% requests
     "time_filter": "month",
-    "comments_per_post": 200,
-    "comment_depth": 6,
+    "comments_per_post": 50,          # was 200
+    "comment_depth": 3,               # was 6
     "min_user_karma": 100,
     "min_user_posts": 5,
-    "user_history_limit": 100,
-    "max_users_per_subreddit": 50,
-    "max_comment_posts_per_sub": 20,
+    "user_history_limit": 25,         # was 100
+    "max_users_per_subreddit": 10,    # was 50 — biggest time sink
+    "max_comment_posts_per_sub": 5,   # was 20
     "scrape_interval_hours": 24,
 }
 
@@ -375,7 +375,7 @@ JOB_SCRAPE_CONFIG = {
         "Singapore",
         "Remote",
     ],
-    "sites": ["indeed", "linkedin", "google"],
+    "sites": ["indeed", "linkedin", "google", "glassdoor", "zip_recruiter"],
     "results_per_search": 50,
     "hours_old": 168,
     "scrape_interval_hours": 24,
@@ -448,21 +448,38 @@ ATS_SCRAPE_CONFIG = {
     "scrape_interval_hours": 24,
     "request_delay": 1.0,
     "greenhouse_slugs": [
-        "openai", "anthropic", "figma", "notion", "vercel", "databricks",
-        "anyscale", "cohere", "inflectionai", "characterai", "mistralai",
-        "stabilityai", "huggingface", "deepmind", "scale", "mosaicml",
-        "runway", "replit", "midjourney", "perplexityai", "pinecone",
-        "weaviate", "qdrant", "langchain", "modal", "weights-and-biases",
-        "arize-ai", "dbt-labs", "prefect", "posthog", "stripe", "rippling",
+        # AI Labs & Frontier models
+        "openai", "anthropic", "cohere", "mistralai", "inflectionai",
+        "characterai", "stabilityai", "huggingface", "deepmind", "scale",
+        "mosaicml", "together-ai", "adept", "aleph-alpha",
+        # AI infra & tooling
+        "anyscale", "modal", "weights-and-biases", "arize-ai", "langchain",
+        "pinecone", "weaviate", "qdrant", "prefect", "dbt-labs",
+        "astronomer", "great-expectations", "tecton", "feast",
+        # AI product companies
+        "runway", "midjourney", "perplexityai", "cursor", "codeium",
+        "cognition-labs", "harvey", "glean", "covariant",
+        # Dev tools & infra
+        "vercel", "replit", "figma", "notion", "linear", "retool",
+        "supabase", "planetscale", "neon", "turso",
+        # Fintech / enterprise
+        "stripe", "rippling", "brex", "ramp", "mercury",
+        "posthog", "segment",
     ],
     "lever_slugs": [
         "openai", "anthropic", "figma", "databricks", "anyscale",
         "cohere", "runway", "replit", "scale", "together-ai",
         "perplexityai", "pinecone", "langchain", "posthog", "brex",
+        "mistralai", "characterai", "adept", "cognition",
+        "glean", "cursor", "codeium", "harvey",
+        "linear", "retool", "mercury", "ramp",
     ],
     "ashby_slugs": [
         "anthropic", "vercel", "notion", "linear", "livekit",
         "replit", "supabase", "resend", "cal-com", "clerk", "inngest",
+        "cursor", "codeium", "turso", "neon", "planetscale",
+        "e2b", "modal", "fly-io", "railway", "render",
+        "langchain", "crew-ai", "composio",
     ],
 }
 
