@@ -98,12 +98,18 @@ def proxy_client(
     """
     Return an httpx.AsyncClient routed through the DataImpulse proxy.
     Falls back to direct connection if proxy is not configured.
+    Uses httpx 0.27+ compatible `proxy=` (singular) parameter.
     """
     purl = proxy_url(sticky_session)
-    proxies = {"http://": purl, "https://": purl} if purl else None
+    if purl:
+        return httpx.AsyncClient(
+            proxy=purl,             # httpx 0.27+: single proxy URL string
+            timeout=timeout,
+            follow_redirects=follow_redirects,
+            verify=False,           # residential proxies MITM SSL — disable cert check
+        )
     return httpx.AsyncClient(
-        proxies=proxies,
         timeout=timeout,
         follow_redirects=follow_redirects,
-        verify=False,       # residential proxies often MITM SSL — disable cert check
+        verify=False,
     )

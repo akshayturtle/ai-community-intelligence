@@ -109,17 +109,17 @@ class AdzunaScraper(BaseScraper):
             platform_name="adzuna",
             platform_user_id=f"co_{company.lower().replace(' ', '_')[:40]}",
             username=company,
-            display_name=company,
         )
 
         await self.upsert_post(
+            user_id=author,
             platform_name="adzuna",
+            post_type="post",
             platform_post_id=f"adzuna_{job.get('id')}",
-            author_id=author,
+            body=content[:4000],
             title=title,
-            content=content[:4000],
             url=redirect_url,
-            created_at=created_at,
+            posted_at=created_at,
             raw_metadata={
                 "source": "adzuna",
                 "company": company,

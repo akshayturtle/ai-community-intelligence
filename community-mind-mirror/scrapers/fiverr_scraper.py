@@ -144,17 +144,17 @@ class FiverrScraper(BaseScraper):
             platform_name="fiverr",
             platform_user_id=f"seller_{re.sub(r'[^a-z0-9]', '_', seller.lower()[:40])}",
             username=seller,
-            display_name=seller,
         )
 
         await self.upsert_post(
+            user_id=author,
             platform_name="fiverr",
+            post_type="post",
             platform_post_id=f"fiverr_{gig_id}",
-            author_id=author,
+            body=content[:3000],
             title=title,
-            content=content[:3000],
             url=gig_url,
-            created_at=datetime.now(timezone.utc),
+            posted_at=datetime.now(timezone.utc),
             raw_metadata={
                 "source": "fiverr",
                 "gig_id": gig_id,

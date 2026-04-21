@@ -188,18 +188,18 @@ class TwitterScraper(BaseScraper):
             platform_name="twitter",
             platform_user_id=user.get("id_str") or f"tw_{username}",
             username=username,
-            display_name=name,
             profile_url=f"https://x.com/{username}",
         )
 
         await self.upsert_post(
+            user_id=author,
             platform_name="twitter",
+            post_type="post",
             platform_post_id=f"twitter_{tid}",
-            author_id=author,
+            body=text,
             title=text[:120],
-            content=text,
             url=url,
-            created_at=created_at,
+            posted_at=created_at,
             score=likes + retweets * 3,
             raw_metadata={
                 "source": "twitter",

@@ -136,17 +136,17 @@ class FreelancerScraper(BaseScraper):
             platform_name="freelancer",
             platform_user_id=f"project_{pid}",
             username=f"client_{pid}",
-            display_name="Freelancer Client",
         )
 
         await self.upsert_post(
+            user_id=author,
             platform_name="freelancer",
+            post_type="post",
             platform_post_id=f"freelancer_{pid}",
-            author_id=author,
+            body=content[:4000],
             title=title,
-            content=content[:4000],
             url=url,
-            created_at=created_at,
+            posted_at=created_at,
             raw_metadata={
                 "source": "freelancer",
                 "project_id": pid,

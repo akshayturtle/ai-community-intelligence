@@ -96,17 +96,17 @@ class PeoplePerHourScraper(BaseScraper):
                         platform_name="peopleperhour",
                         platform_user_id=f"pph_{post_id}",
                         username="pph_client",
-                        display_name="PeoplePerHour Client",
                     )
 
                     await self.upsert_post(
+                        user_id=author,
                         platform_name="peopleperhour",
+                        post_type="post",
                         platform_post_id=f"pph_{post_id}",
-                        author_id=author,
+                        body=content[:3000],
                         title=title,
-                        content=content[:3000],
                         url=link,
-                        created_at=created_at,
+                        posted_at=created_at,
                         raw_metadata={
                             "source": "peopleperhour",
                             "budget": budget_str,

@@ -199,17 +199,17 @@ class UpworkScraper(BaseScraper):
             platform_name="upwork",
             platform_user_id=f"upwork_job_{jid}",
             username="upwork_client",
-            display_name="Upwork Client",
         )
 
         await self.upsert_post(
+            user_id=author,
             platform_name="upwork",
+            post_type="post",
             platform_post_id=f"upwork_{jid}",
-            author_id=author,
+            body=content[:4000],
             title=title,
-            content=content[:4000],
             url=url,
-            created_at=created_at,
+            posted_at=created_at,
             raw_metadata={
                 "source": "upwork",
                 "job_id": jid,
