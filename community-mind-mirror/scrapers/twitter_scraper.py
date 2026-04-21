@@ -22,13 +22,16 @@ from scrapers.proxy import random_headers
 logger = structlog.get_logger()
 
 # Nitter instances — tried in order, first working one is used
+# Last verified working: Apr 2026 — nitter.tiekoetter.com
 NITTER_INSTANCES = [
+    "https://nitter.tiekoetter.com",   # ✓ working
     "https://nitter.privacydev.net",
     "https://nitter.poast.org",
     "https://nitter.1d4.us",
     "https://nitter.kavin.rocks",
+    "https://nitter.cz",               # redirects to tiekoetter
     "https://nitter.mint.lgbt",
-    "https://nitter.cz",
+    "https://nitter.privacyredirect.com",
 ]
 
 SEARCH_QUERIES = [
@@ -74,24 +77,47 @@ class TwitterScraper(BaseScraper):
             follow_redirects=True,
             verify=False,
         ) as client:
+            use_nitter = True
+
             if self._bearer:
-                # Use official v2 API
-                await self._scrape_v2(client, seen_ids)
-            else:
-                # Find a working Nitter instance then scrape
+                # Probe v2 API — free tier returns 403 on search endpoint
+                probe = await self._probe_v2(client)
+                if probe:
+                    await self._scrape_v2(client, seen_ids)
+                    use_nitter = False
+                else:
+                    self.log.info(
+                        "twitter_v2_fallback",
+                        reason="Bearer token set but search endpoint returned 403 "
+                               "(free tier). Falling back to Nitter.",
+                    )
+
+            if use_nitter:
                 self._nitter_base = await self._find_nitter(client)
                 if not self._nitter_base:
                     self.log.warning(
                         "twitter_no_source",
-                        hint=(
-                            "All Nitter instances unreachable and no TWITTER_BEARER_TOKEN set. "
-                            "Add TWITTER_BEARER_TOKEN to app settings for reliable scraping."
-                        ),
+                        hint="All Nitter instances unreachable. "
+                             "Upgrade to X API Basic ($100/mo) for reliable scraping.",
                     )
                     return
                 await self._scrape_nitter(client, seen_ids)
 
     # ── Official v2 API ──────────────────────────────────────────────────────
+
+    async def _probe_v2(self, client: httpx.AsyncClient) -> bool:
+        """Return True if bearer token can access the recent search endpoint."""
+        try:
+            resp = await client.get(
+                TWITTER_V2_URL,
+                params={"query": "test", "max_results": 10},
+                headers={"Authorization": f"Bearer {self._bearer}"},
+                timeout=10.0,
+            )
+            # 200 = works, 429 = rate limited but auth OK (still use it)
+            return resp.status_code in (200, 429)
+        except Exception:
+            return False
 
     async def _scrape_v2(self, client: httpx.AsyncClient, seen_ids: set[str]):
         headers = {
