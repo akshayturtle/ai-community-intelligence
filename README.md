@@ -826,8 +826,3 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ---
 
-## Built By
-
-**[Turtle Techsai](https://turtletechsai.com)** — Building AI-powered intelligence tools.
-
-For custom deployments, enterprise features, or consulting inquiries: **akshay.gupta@turtletechsai.com**
